@@ -1,18 +1,14 @@
-// Pipeline Registers Module
-
 module pipeline_registers (
     input  wire        clk,
     input  wire        rst_n,
     input  wire        stall,
     input  wire        flush,
     
-    // IF/ID
     input  wire [31:0] if_pc,
     input  wire [31:0] if_instr,
     output reg  [31:0] id_pc,
     output reg  [31:0] id_instr,
     
-    // ID/EX
     input  wire [31:0] id_rs1,
     input  wire [31:0] id_rs2,
     input  wire [31:0] id_imm,
@@ -20,7 +16,7 @@ module pipeline_registers (
     input  wire        id_reg_write,
     input  wire        id_mem_read,
     input  wire        id_mem_write,
-    input  wire [3:0]  id_alu_op,
+    input  wire [4:0]  id_alu_op,
     input  wire [1:0]  id_alu_src_a,
     input  wire [1:0]  id_alu_src_b,
     output reg  [31:0] ex_rs1,
@@ -30,11 +26,10 @@ module pipeline_registers (
     output reg         ex_reg_write,
     output reg         ex_mem_read,
     output reg         ex_mem_write,
-    output reg  [3:0]  ex_alu_op,
+    output reg  [4:0]  ex_alu_op,
     output reg  [1:0]  ex_alu_src_a,
     output reg  [1:0]  ex_alu_src_b,
     
-    // EX/MEM
     input  wire [31:0] ex_alu_result,
     input  wire [31:0] ex_rs2_mem,
     input  wire [4:0]  ex_rd_mem,
@@ -48,7 +43,6 @@ module pipeline_registers (
     output reg         mem_mem_write,
     output reg         mem_reg_write,
     
-    // MEM/WB
     input  wire [31:0] mem_read_data,
     input  wire [31:0] mem_alu_wb,
     input  wire [4:0]  mem_rd_wb,
@@ -80,7 +74,7 @@ module pipeline_registers (
             ex_reg_write <= 1'b0;
             ex_mem_read <= 1'b0;
             ex_mem_write <= 1'b0;
-            ex_alu_op <= 4'h0;
+            ex_alu_op <= 5'h0;
             ex_alu_src_a <= 2'h0;
             ex_alu_src_b <= 2'h0;
         end else if (!stall) begin
