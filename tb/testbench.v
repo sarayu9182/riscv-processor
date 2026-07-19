@@ -21,6 +21,13 @@ module testbench;
     integer test_failed;
     integer cycle_count;
     
+    // Performance Metrics
+    integer total_cycles = 0;
+    integer total_instr = 0;
+    integer total_mem_access = 0;
+    integer total_mem_reads = 0;
+    integer total_mem_writes = 0;
+    
     riscv_core dut (
         .clk        (clk),
         .rst_n      (rst_n),
@@ -40,6 +47,19 @@ module testbench;
     initial begin
         clk = 0;
         forever #5 clk = ~clk;
+    end
+    
+    // Performance Monitoring
+    always @(posedge clk) begin
+        if (rst_n) begin
+            total_cycles = total_cycles + 1;
+            if (mem_write || mem_read) begin
+                total_instr = total_instr + 1;
+                total_mem_access = total_mem_access + 1;
+                if (mem_read) total_mem_reads = total_mem_reads + 1;
+                if (mem_write) total_mem_writes = total_mem_writes + 1;
+            end
+        end
     end
     
     initial begin
@@ -82,6 +102,8 @@ module testbench;
         
         #10;
         $display("========================================");
+        $display("TEST RESULTS");
+        $display("========================================");
         $display("Final data_mem[0] = 0x%08h", data_mem[0]);
         $display("Expected = 0x0000000A");
         
@@ -93,7 +115,53 @@ module testbench;
             test_failed = 1;
         end
         
+        // Performance Metrics Report
         $display("========================================");
+        $display("PERFORMANCE METRICS");
+        $display("========================================");
+        $display("Total Instructions: %0d", total_instr);
+        $display("Total Cycles: %0d", total_cycles);
+        if (total_instr > 0)
+            $display("CPI: %0.2f", total_cycles * 1.0 / total_instr);
+        else
+            $display("CPI: N/A (no instructions executed)");
+        
+        $display("----------------------------------------");
+        $display("MEMORY ACCESS STATISTICS");
+        $display("----------------------------------------");
+        $display("Total Memory Accesses: %0d", total_mem_access);
+        $display("Memory Reads: %0d", total_mem_reads);
+        $display("Memory Writes: %0d", total_mem_writes);
+        if (total_instr > 0)
+            $display("Memory Access Ratio: %0.2f accesses/instruction", 
+                     total_mem_access * 1.0 / total_instr);
+        
+        $display("----------------------------------------");
+        $display("INSTRUCTION MIX");
+        $display("----------------------------------------");
+        $display("ALU Operations: %0d", total_instr - total_mem_access);
+        $display("Memory Operations: %0d", total_mem_access);
+        if (total_instr > 0)
+            $display("ALU/Memory Ratio: %0.2f", 
+                     (total_instr - total_mem_access) * 1.0 / (total_mem_access + 1));
+        
+        // Branch Predictor Performance (if available)
+        if (dut.branch_count !== undefined) begin
+            $display("----------------------------------------");
+            $display("BRANCH PREDICTOR PERFORMANCE");
+            $display("----------------------------------------");
+            $display("Total Branches: %0d", dut.branch_count);
+            $display("Correct Predictions: %0d", dut.branch_correct);
+            $display("Incorrect Predictions: %0d", dut.branch_incorrect);
+            if (dut.branch_count > 0)
+                $display("Prediction Accuracy: %0d%%", 
+                         (dut.branch_correct * 100) / dut.branch_count);
+            else
+                $display("Prediction Accuracy: N/A (no branches)");
+        end
+        
+        $display("========================================");
+        $display("End of simulation at time %0t", $time);
         $finish;
     end
     
