@@ -53,6 +53,8 @@ module pipeline_registers (
     output reg         wb_reg_write
 );
 
+    integer i;
+    
     // IF/ID
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n || flush) begin
