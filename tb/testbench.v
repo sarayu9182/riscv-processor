@@ -20,7 +20,6 @@ module testbench;
     integer test_passed;
     integer test_failed;
     integer cycle_count;
-    integer instr_count;
     
     riscv_core dut (
         .clk        (clk),
@@ -35,7 +34,6 @@ module testbench;
         .halt_o     (halt)
     );
     
-    // FIXED: Use PC for instruction memory, not addr
     assign instr_data = instr_mem[pc[11:2]];
     assign mem_data = data_mem[addr[11:2]];
     
@@ -55,7 +53,6 @@ module testbench;
         test_passed = 0;
         test_failed = 0;
         cycle_count = 0;
-        instr_count = 0;
         
         $display("Instructions loaded:");
         $display("  [0] 0x%08h", instr_mem[0]);
@@ -71,11 +68,6 @@ module testbench;
             @(negedge clk);
             cycle_count = cycle_count + 1;
             
-            // Count instructions (non-NOP)
-            if (instr_data != 32'h00000013) begin
-                instr_count = instr_count + 1;
-            end
-            
             if (mem_write) begin
                 $display("CYCLE %0d: WRITE at addr=0x%08h data=0x%08h pc=0x%08h", 
                          cycle_count, addr, data_o, pc);
@@ -86,17 +78,9 @@ module testbench;
                 $display("CYCLE %0d: pc=0x%08h instr=0x%08h mem_write=%0d", 
                          cycle_count, pc, instr_data, mem_write);
             end
-            
-            // Early exit if halt detected
-            if (halt) begin
-                $display("HALT detected at cycle %0d", cycle_count);
-                break;
-            end
         end
         
         #10;
-        $display("========================================");
-        $display("TEST RESULTS");
         $display("========================================");
         $display("Final data_mem[0] = 0x%08h", data_mem[0]);
         $display("Expected = 0x0000000A");
@@ -109,79 +93,7 @@ module testbench;
             test_failed = 1;
         end
         
-        // Performance Report
         $display("========================================");
-        $display("PERFORMANCE REPORT");
-        $display("========================================");
-        $display("Total Cycles: %0d", cycle_count);
-        $display("Instructions Executed: %0d", instr_count);
-        $display("CPI (Cycles Per Instruction): %0.2f", 
-                 (cycle_count * 1.0) / (instr_count > 0 ? instr_count : 1));
-        
-        // Cache Performance Metrics
-        $display("----------------------------------------");
-        $display("CACHE STATISTICS");
-        $display("----------------------------------------");
-        
-        // Instruction Cache
-        $display("I-Cache:");
-        $display("  Hits:  %0d", dut.icache.hit_count);
-        $display("  Misses: %0d", dut.icache.miss_count);
-        $display("  Hit Rate: %0.2f%%", 
-                 (dut.icache.hit_count * 100.0) / 
-                 (dut.icache.hit_count + dut.icache.miss_count + 1));
-        $display("  Miss Rate: %0.2f%%", 
-                 (dut.icache.miss_count * 100.0) / 
-                 (dut.icache.hit_count + dut.icache.miss_count + 1));
-        
-        // Data Cache
-        $display("D-Cache:");
-        $display("  Hits:  %0d", dut.dcache.hit_count);
-        $display("  Misses: %0d", dut.dcache.miss_count);
-        $display("  Hit Rate: %0.2f%%", 
-                 (dut.dcache.hit_count * 100.0) / 
-                 (dut.dcache.hit_count + dut.dcache.miss_count + 1));
-        $display("  Miss Rate: %0.2f%%", 
-                 (dut.dcache.miss_count * 100.0) / 
-                 (dut.dcache.hit_count + dut.dcache.miss_count + 1));
-        
-        // Combined Cache Performance
-        $display("----------------------------------------");
-        $display("COMBINED CACHE PERFORMANCE");
-        $display("----------------------------------------");
-        $display("Total Cache Accesses: %0d", 
-                 dut.icache.hit_count + dut.icache.miss_count + 
-                 dut.dcache.hit_count + dut.dcache.miss_count);
-        $display("Total Cache Hits: %0d", 
-                 dut.icache.hit_count + dut.dcache.hit_count);
-        $display("Total Cache Misses: %0d", 
-                 dut.icache.miss_count + dut.dcache.miss_count);
-        $display("Overall Hit Rate: %0.2f%%", 
-                 ((dut.icache.hit_count + dut.dcache.hit_count) * 100.0) / 
-                 (dut.icache.hit_count + dut.icache.miss_count + 
-                  dut.dcache.hit_count + dut.dcache.miss_count + 1));
-        $display("Overall Miss Rate: %0.2f%%", 
-                 ((dut.icache.miss_count + dut.dcache.miss_count) * 100.0) / 
-                 (dut.icache.hit_count + dut.icache.miss_count + 
-                  dut.dcache.hit_count + dut.dcache.miss_count + 1));
-        
-        // Branch Predictor Performance
-        $display("----------------------------------------");
-        $display("BRANCH PREDICTOR STATISTICS");
-        $display("----------------------------------------");
-        if (dut.bp) begin
-            $display("Branch Predictions: %0d", dut.bp.total_predictions);
-            $display("Correct Predictions: %0d", dut.bp.correct_predictions);
-            $display("Incorrect Predictions: %0d", dut.bp.incorrect_predictions);
-            $display("Prediction Accuracy: %0.2f%%", 
-                     (dut.bp.correct_predictions * 100.0) / 
-                     (dut.bp.total_predictions + 1));
-        end else begin
-            $display("Branch predictor not instantiated or not accessible");
-        end
-        
-        $display("========================================");
-        $display("End of simulation at time %0t", $time);
         $finish;
     end
     
@@ -189,5 +101,5 @@ module testbench;
         $dumpfile("sim/waveforms.vcd");
         $dumpvars(0, testbench);
     end
-    
+
 endmodule
