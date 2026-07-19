@@ -5,14 +5,20 @@ module memory_stage (
     input  wire [31:0] rs2_data,
     input  wire        mem_read,
     input  wire        mem_write,
-    output wire [31:0] addr_o,
-    output wire [31:0] data_o,
+    output reg  [31:0] addr_o,
+    output reg  [31:0] data_o,
     input  wire [31:0] data_i,
-    output wire [31:0] read_data
+    output reg  [31:0] read_data
 );
 
-    assign addr_o = alu_result;
-    assign data_o = rs2_data;
-    assign read_data = data_i;
+    always @(*) begin
+        addr_o = alu_result;
+        data_o = rs2_data;
+        if (mem_read) begin
+            read_data = data_i;
+        end else begin
+            read_data = 32'h0;
+        end
+    end
 
 endmodule

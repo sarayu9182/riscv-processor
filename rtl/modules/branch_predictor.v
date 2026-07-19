@@ -13,18 +13,18 @@ module branch_predictor (
     
     integer i;
     
-    // Initialize counters to weakly taken (2'b10)
+    // Initialize all counters to weakly taken (2'b10)
     initial begin
         for (i = 0; i < 256; i = i + 1)
             counter[i] = 2'b10;
     end
     
-    // Read counter
+    // Read counter based on PC
     always @(*) begin
         counter_out = counter[pc[9:2]];
     end
     
-    // Update counter on branch resolution
+    // Update counter when branch is resolved
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             for (i = 0; i < 256; i = i + 1)
@@ -39,7 +39,7 @@ module branch_predictor (
         end
     end
     
-    // Prediction: taken if counter >= 2
+    // Prediction: taken if counter >= 2 (2'b10)
     assign predict_taken = (counter_out >= 2'b10);
 
 endmodule
