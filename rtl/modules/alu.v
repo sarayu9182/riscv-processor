@@ -1,7 +1,3 @@
-// ============================================================================
-// ALU for RISC-V RV32I + M Extension (MUL, DIV)
-// ============================================================================
-
 module alu (
     input  wire [31:0] a,
     input  wire [31:0] b,
@@ -12,9 +8,6 @@ module alu (
     output wire        overflow
 );
 
-    // ========================================================================
-    // ALU Operations
-    // ========================================================================
     localparam OP_ADD    = 5'h00,
                OP_SUB    = 5'h01,
                OP_AND    = 5'h02,
@@ -32,21 +25,13 @@ module alu (
                OP_DIV    = 5'h0E,
                OP_DIVU   = 5'h0F,
                OP_REM    = 5'h10,
-               OP_REMU   = 5'h11,
-               OP_COPY_A = 5'h12,
-               OP_COPY_B = 5'h13;
+               OP_REMU   = 5'h11;
     
-    // ========================================================================
-    // Internal Signals
-    // ========================================================================
     reg [32:0] extended_result;
     reg [31:0] b_shift;
     reg [63:0] mult_result;
     reg [31:0] quotient, remainder;
     
-    // ========================================================================
-    // ALU Logic
-    // ========================================================================
     always @(*) begin
         result = 32'h0;
         mult_result = 64'h0;
@@ -54,73 +39,47 @@ module alu (
         remainder = 32'h0;
         
         case (op)
-            // Arithmetic
             OP_ADD: begin
                 extended_result = {1'b0, a} + {1'b0, b};
                 result = extended_result[31:0];
             end
-            
             OP_SUB: begin
                 extended_result = {1'b0, a} - {1'b0, b};
                 result = extended_result[31:0];
             end
-            
-            // Logical
             OP_AND: result = a & b;
             OP_OR:  result = a | b;
             OP_XOR: result = a ^ b;
-            
-            // Shifts
             OP_SLL: begin
                 b_shift = b[4:0];
                 result = a << b_shift;
             end
-            
             OP_SRL: begin
                 b_shift = b[4:0];
                 result = a >> b_shift;
             end
-            
             OP_SRA: begin
                 b_shift = b[4:0];
                 result = $signed(a) >>> b_shift;
             end
-            
-            // Compare
-            OP_SLT: begin
-                result = ($signed(a) < $signed(b)) ? 32'h1 : 32'h0;
-            end
-            
-            OP_SLTU: begin
-                result = (a < b) ? 32'h1 : 32'h0;
-            end
-            
-            // ================================================================
-            // M Extension - Multiplication
-            // ================================================================
+            OP_SLT: result = ($signed(a) < $signed(b)) ? 32'h1 : 32'h0;
+            OP_SLTU: result = (a < b) ? 32'h1 : 32'h0;
             OP_MUL: begin
                 mult_result = $signed(a) * $signed(b);
                 result = mult_result[31:0];
             end
-            
             OP_MULH: begin
                 mult_result = $signed(a) * $signed(b);
                 result = mult_result[63:32];
             end
-            
             OP_MULHU: begin
                 mult_result = a * b;
                 result = mult_result[63:32];
             end
-            
             OP_MULHSU: begin
                 mult_result = $signed(a) * b;
                 result = mult_result[63:32];
             end
-            
-            // ================================================================
-            // M Extension - Division
-            // ================================================================
             OP_DIV: begin
                 if (b != 32'h0) begin
                     quotient = $signed(a) / $signed(b);
@@ -129,7 +88,6 @@ module alu (
                     result = 32'hFFFFFFFF;
                 end
             end
-            
             OP_DIVU: begin
                 if (b != 32'h0) begin
                     quotient = a / b;
@@ -138,7 +96,6 @@ module alu (
                     result = 32'hFFFFFFFF;
                 end
             end
-            
             OP_REM: begin
                 if (b != 32'h0) begin
                     remainder = $signed(a) % $signed(b);
@@ -147,7 +104,6 @@ module alu (
                     result = a;
                 end
             end
-            
             OP_REMU: begin
                 if (b != 32'h0) begin
                     remainder = a % b;
@@ -156,18 +112,10 @@ module alu (
                     result = a;
                 end
             end
-            
-            // Copy
-            OP_COPY_A: result = a;
-            OP_COPY_B: result = b;
-            
             default: result = 32'h0;
         endcase
     end
     
-    // ========================================================================
-    // Status Flags
-    // ========================================================================
     assign zero = (result == 32'h0);
     assign carry_out = extended_result[32];
     assign overflow = ((op == OP_ADD) && (a[31] == b[31]) && (result[31] != a[31])) ||
