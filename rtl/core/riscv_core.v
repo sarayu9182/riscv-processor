@@ -1,4 +1,4 @@
-module riscv_core_pipeline (
+module riscv_core (
     input  wire        clk,
     input  wire        rst_n,
     input  wire [31:0] instr_i,
@@ -12,7 +12,7 @@ module riscv_core_pipeline (
 );
 
     // ========================================================================
-    // IF Stage - Program Counter
+    // PC
     // ========================================================================
     reg [31:0] pc;
     wire [31:0] pc_next;
@@ -24,8 +24,12 @@ module riscv_core_pipeline (
     assign pc_o = pc;
     
     // ========================================================================
-    // IF/ID Pipeline Register
+    // IF Stage - Instruction Fetch
     // ========================================================================
+    wire [31:0] if_instr;
+    assign if_instr = instr_i;
+    
+    // IF/ID Pipeline
     reg [31:0] if_id_pc, if_id_instr;
     
     always @(posedge clk or negedge rst_n) begin
@@ -34,7 +38,7 @@ module riscv_core_pipeline (
             if_id_instr <= 32'h0;
         end else if (!stall) begin
             if_id_pc <= pc;
-            if_id_instr <= instr_i;
+            if_id_instr <= if_instr;
         end
     end
     
@@ -69,7 +73,7 @@ module riscv_core_pipeline (
                           (opcode == 7'b1101111) ? 3'b100 :
                           3'b000;
     
-    // Control Signals
+    // Control Unit
     wire reg_write, mem_read, mem_write;
     wire [4:0] alu_op;
     wire [1:0] alu_src_a, alu_src_b;
@@ -102,7 +106,7 @@ module riscv_core_pipeline (
     assign rs2_data = (rs2 == 5'h0) ? 32'h0 : reg_file[rs2];
     
     // ========================================================================
-    // ID/EX Pipeline Register
+    // ID/EX Pipeline
     // ========================================================================
     reg [31:0] id_ex_rs1, id_ex_rs2, id_ex_imm, id_ex_pc;
     reg [4:0]  id_ex_rd;
@@ -145,22 +149,29 @@ module riscv_core_pipeline (
     end
     
     // ========================================================================
-    // Hazard Detection Unit
+    // Hazard Detection
     // ========================================================================
     assign stall = id_ex_mem_read && (id_ex_rd == rs1 || id_ex_rd == rs2) && (id_ex_rd != 5'h0);
     assign flush = stall;
     
     // ========================================================================
-    // Forwarding Unit
+    // EX/MEM Signals
     // ========================================================================
     reg [31:0] ex_mem_alu_result, ex_mem_rs2;
     reg [4:0]  ex_mem_rd;
-    reg        ex_mem_reg_write;
+    reg        ex_mem_reg_write, ex_mem_mem_read, ex_mem_mem_write;
     
+    // ========================================================================
+    // MEM/WB Signals
+    // ========================================================================
     reg [31:0] mem_wb_alu_result, mem_wb_mem_data;
     reg [4:0]  mem_wb_rd;
     reg        mem_wb_reg_write;
+    wire [31:0] mem_wb_data;
     
+    // ========================================================================
+    // Forwarding Unit
+    // ========================================================================
     wire [1:0] forward_a, forward_b;
     wire [31:0] fwd_rs1, fwd_rs2;
     
@@ -209,10 +220,11 @@ module riscv_core_pipeline (
         (id_ex_branch_op == 3'b001 && ~alu_zero)
     );
     
+    // ========================================================================
     // PC Next
+    // ========================================================================
     assign pc_next = branch_taken ? (id_ex_pc + id_ex_imm) : pc_plus_4;
     
-    // PC Update
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n)
             pc <= 32'h0;
@@ -221,34 +233,25 @@ module riscv_core_pipeline (
     end
     
     // ========================================================================
-    // EX/MEM Pipeline Register
+    // EX/MEM Pipeline
     // ========================================================================
-    reg [31:0] ex_mem_alu_result_reg, ex_mem_rs2_reg;
-    reg [4:0]  ex_mem_rd_reg;
-    reg        ex_mem_reg_write_reg, ex_mem_mem_read_reg, ex_mem_mem_write_reg;
-    
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            ex_mem_alu_result_reg <= 32'h0;
-            ex_mem_rs2_reg <= 32'h0;
-            ex_mem_rd_reg <= 5'h0;
-            ex_mem_reg_write_reg <= 1'b0;
-            ex_mem_mem_read_reg <= 1'b0;
-            ex_mem_mem_write_reg <= 1'b0;
+            ex_mem_alu_result <= 32'h0;
+            ex_mem_rs2 <= 32'h0;
+            ex_mem_rd <= 5'h0;
+            ex_mem_reg_write <= 1'b0;
+            ex_mem_mem_read <= 1'b0;
+            ex_mem_mem_write <= 1'b0;
         end else begin
-            ex_mem_alu_result_reg <= alu_result;
-            ex_mem_rs2_reg <= fwd_rs2;
-            ex_mem_rd_reg <= id_ex_rd;
-            ex_mem_reg_write_reg <= id_ex_reg_write;
-            ex_mem_mem_read_reg <= id_ex_mem_read;
-            ex_mem_mem_write_reg <= id_ex_mem_write;
+            ex_mem_alu_result <= alu_result;
+            ex_mem_rs2 <= fwd_rs2;
+            ex_mem_rd <= id_ex_rd;
+            ex_mem_reg_write <= id_ex_reg_write;
+            ex_mem_mem_read <= id_ex_mem_read;
+            ex_mem_mem_write <= id_ex_mem_write;
         end
     end
-    
-    assign ex_mem_alu_result = ex_mem_alu_result_reg;
-    assign ex_mem_rs2 = ex_mem_rs2_reg;
-    assign ex_mem_rd = ex_mem_rd_reg;
-    assign ex_mem_reg_write = ex_mem_reg_write_reg;
     
     // ========================================================================
     // MEM Stage - Memory
@@ -258,10 +261,10 @@ module riscv_core_pipeline (
     memory_stage memory (
         .clk        (clk),
         .rst_n      (rst_n),
-        .alu_result (ex_mem_alu_result_reg),
-        .rs2_data   (ex_mem_rs2_reg),
-        .mem_read   (ex_mem_mem_read_reg),
-        .mem_write  (ex_mem_mem_write_reg),
+        .alu_result (ex_mem_alu_result),
+        .rs2_data   (ex_mem_rs2),
+        .mem_read   (ex_mem_mem_read),
+        .mem_write  (ex_mem_mem_write),
         .addr_o     (addr_o),
         .data_o     (data_o),
         .data_i     (data_i),
@@ -269,39 +272,26 @@ module riscv_core_pipeline (
     );
     
     // ========================================================================
-    // MEM/WB Pipeline Register
+    // MEM/WB Pipeline
     // ========================================================================
-    reg [31:0] mem_wb_alu_result_reg, mem_wb_mem_data_reg;
-    reg [4:0]  mem_wb_rd_reg;
-    reg        mem_wb_reg_write_reg;
-    
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            mem_wb_alu_result_reg <= 32'h0;
-            mem_wb_mem_data_reg <= 32'h0;
-            mem_wb_rd_reg <= 5'h0;
-            mem_wb_reg_write_reg <= 1'b0;
+            mem_wb_alu_result <= 32'h0;
+            mem_wb_mem_data <= 32'h0;
+            mem_wb_rd <= 5'h0;
+            mem_wb_reg_write <= 1'b0;
         end else begin
-            mem_wb_alu_result_reg <= ex_mem_alu_result_reg;
-            mem_wb_mem_data_reg <= mem_data;
-            mem_wb_rd_reg <= ex_mem_rd_reg;
-            mem_wb_reg_write_reg <= ex_mem_reg_write_reg;
+            mem_wb_alu_result <= ex_mem_alu_result;
+            mem_wb_mem_data <= mem_data;
+            mem_wb_rd <= ex_mem_rd;
+            mem_wb_reg_write <= ex_mem_reg_write;
         end
     end
     
-    assign mem_wb_alu_result = mem_wb_alu_result_reg;
-    assign mem_wb_mem_data = mem_wb_mem_data_reg;
-    assign mem_wb_rd = mem_wb_rd_reg;
-    assign mem_wb_reg_write = mem_wb_reg_write_reg;
-    
-    // ========================================================================
-    // WB Stage - Writeback
-    // ========================================================================
-    wire [31:0] mem_wb_data;
     assign mem_wb_data = mem_wb_mem_data ? mem_wb_mem_data : mem_wb_alu_result;
     
     // ========================================================================
-    // Register File Write
+    // Register File Write (WB Stage)
     // ========================================================================
     integer i;
     always @(posedge clk or negedge rst_n) begin
@@ -318,8 +308,8 @@ module riscv_core_pipeline (
     // ========================================================================
     // Outputs
     // ========================================================================
-    assign mem_write_o = ex_mem_mem_write_reg;
-    assign mem_read_o = ex_mem_mem_read_reg;
+    assign mem_write_o = ex_mem_mem_write;
+    assign mem_read_o = ex_mem_mem_read;
     assign halt_o = 1'b0;
 
 endmodule
