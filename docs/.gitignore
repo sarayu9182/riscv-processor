@@ -1,0 +1,31 @@
+# Build artifacts
+build/
+sim/*.vcd
+sim/*.fst
+sim/results/
+
+# Icarus Verilog
+*.o
+*.vvp
+*.vpi
+
+# GTKWave
+*.gtkw
+*.sav
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Toolchain
+riscv64-elf-*
+*.elf
+*.o
+*.hex
